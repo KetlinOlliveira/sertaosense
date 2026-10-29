@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: dispositivos
+
+  config:
+    # Lê o .env da raiz como se fosse um .properties. "optional:" = não falha se o arquivo não existir
+    # (ex.: dentro do Docker, onde as variáveis chegam pelo ambiente). Dois caminhos porque o
+    # diretório de trabalho muda: "mvn spring-boot:run" roda em dispositivos/, a IDE costuma rodar na raiz.
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+
+  datasource:
+    # Rodando na sua máquina: porta publicada no host (do .env). No Compose (Passo 5) a variável de
+    # ambiente SPRING_DATASOURCE_URL sobrescreve este valor com o hostname postgres-dispositivos:5432.
+    url: jdbc:postgresql://localhost:${DISPOSITIVOS_DB_PORT}/${DISPOSITIVOS_DB_NAME}
+    username: ${DISPOSITIVOS_DB_USER}
+    password: ${DISPOSITIVOS_DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      # Quem cria/altera tabelas é o Flyway. O Hibernate só confere se as entidades batem com o schema.
+      ddl-auto: validate
+    # Fecha a sessão do Hibernate ao fim da transação, não ao fim da requisição HTTP
+    open-in-view: false
+
+server:
+  # Faixa 809x para os serviços do SertãoSense (8081 já é usada por outro projeto nesta máquina)
+  port: 8091

@@ -1,0 +1,51 @@
+# Infraestrutura local do SertãoSense.
+# Credenciais vêm do arquivo .env (não versionado), lido automaticamente pelo Compose.
+services:
+
+  # Banco exclusivo do serviço dispositivos (padrão "um banco por serviço", ver ADR-001)
+  postgres-dispositivos:
+    image: postgres:16
+    container_name: postgres-dispositivos
+    environment:
+      # ${VAR:?msg}: o Compose falha com essa mensagem se a variável não existir no .env
+      POSTGRES_DB: ${DISPOSITIVOS_DB_NAME:?defina DISPOSITIVOS_DB_NAME no .env}
+      POSTGRES_USER: ${DISPOSITIVOS_DB_USER:?defina DISPOSITIVOS_DB_USER no .env}
+      POSTGRES_PASSWORD: ${DISPOSITIVOS_DB_PASSWORD:?defina DISPOSITIVOS_DB_PASSWORD no .env}
+    ports:
+      # host:container. A porta de fora vem do .env (evita colisão com outros Postgres); dentro é sempre 5432
+      - "${DISPOSITIVOS_DB_PORT:?defina DISPOSITIVOS_DB_PORT no .env}:5432"
+    volumes:
+      # volume nomeado: os dados sobrevivem a "docker compose down"
+      - dispositivos-data:/var/lib/postgresql/data
+    healthcheck:
+      # "healthy" só quando o Postgres aceita conexões; usado depois pelo depends_on do serviço.
+      # -h 127.0.0.1 força TCP: durante a inicialização o Postgres sobe um servidor temporário
+      # só no socket local, e sem -h o pg_isready responderia "pronto" cedo demais.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # Serviço de cadastro de cisternas e sensores (Spring Boot)
+  dispositivos:
+    build:
+      context: .                            # raiz: o build precisa do pom pai
+      dockerfile: dispositivos/Dockerfile
+    container_name: dispositivos
+    environment:
+      # Variáveis de ambiente têm prioridade sobre o application.yml (SPRING_DATASOURCE_URL ->
+      # spring.datasource.url). Dentro da rede do Compose o banco é achado pelo NOME do serviço,
+      # na porta interna 5432. A porta publicada no host não vale aqui.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-dispositivos:5432/${DISPOSITIVOS_DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DISPOSITIVOS_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DISPOSITIVOS_DB_PASSWORD}
+    ports:
+      - "8091:8091"
+    depends_on:
+      postgres-dispositivos:
+        # espera o healthcheck passar, não só o container iniciar
+        condition: service_healthy
+
+volumes:
+  dispositivos-data:
