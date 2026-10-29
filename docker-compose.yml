@@ -1,0 +1,31 @@
+# Infraestrutura local do SertãoSense.
+# Credenciais vêm do arquivo .env (não versionado), lido automaticamente pelo Compose.
+services:
+
+  # Banco exclusivo do serviço dispositivos (padrão "um banco por serviço", ver ADR-001)
+  postgres-dispositivos:
+    image: postgres:16
+    container_name: postgres-dispositivos
+    environment:
+      # ${VAR:?msg}: o Compose falha com essa mensagem se a variável não existir no .env
+      POSTGRES_DB: ${DISPOSITIVOS_DB_NAME:?defina DISPOSITIVOS_DB_NAME no .env}
+      POSTGRES_USER: ${DISPOSITIVOS_DB_USER:?defina DISPOSITIVOS_DB_USER no .env}
+      POSTGRES_PASSWORD: ${DISPOSITIVOS_DB_PASSWORD:?defina DISPOSITIVOS_DB_PASSWORD no .env}
+    ports:
+      # host:container. A porta de fora vem do .env (evita colisão com outros Postgres); dentro é sempre 5432
+      - "${DISPOSITIVOS_DB_PORT:?defina DISPOSITIVOS_DB_PORT no .env}:5432"
+    volumes:
+      # volume nomeado: os dados sobrevivem a "docker compose down"
+      - dispositivos-data:/var/lib/postgresql/data
+    healthcheck:
+      # "healthy" só quando o Postgres aceita conexões; usado depois pelo depends_on do serviço.
+      # -h 127.0.0.1 força TCP: durante a inicialização o Postgres sobe um servidor temporário
+      # só no socket local, e sem -h o pg_isready responderia "pronto" cedo demais.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  dispositivos-data:
