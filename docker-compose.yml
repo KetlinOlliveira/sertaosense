@@ -27,5 +27,25 @@ services:
       retries: 10
       start_period: 10s
 
+  # Serviço de cadastro de cisternas e sensores (Spring Boot)
+  dispositivos:
+    build:
+      context: .                            # raiz: o build precisa do pom pai
+      dockerfile: dispositivos/Dockerfile
+    container_name: dispositivos
+    environment:
+      # Variáveis de ambiente têm prioridade sobre o application.yml (SPRING_DATASOURCE_URL ->
+      # spring.datasource.url). Dentro da rede do Compose o banco é achado pelo NOME do serviço,
+      # na porta interna 5432. A porta publicada no host não vale aqui.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-dispositivos:5432/${DISPOSITIVOS_DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DISPOSITIVOS_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DISPOSITIVOS_DB_PASSWORD}
+    ports:
+      - "8091:8091"
+    depends_on:
+      postgres-dispositivos:
+        # espera o healthcheck passar, não só o container iniciar
+        condition: service_healthy
+
 volumes:
   dispositivos-data:

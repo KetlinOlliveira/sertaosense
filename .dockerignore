@@ -1,0 +1,13 @@
+# O que o Docker NÃO envia para o build (contexto = raiz do repositório)
+
+# Segredos: as credenciais chegam ao container por variável de ambiente, nunca dentro da imagem
+.env
+
+# Artefatos locais: o build acontece dentro do container
+**/target/
+
+# Irrelevante para a imagem
+.git/
+.idea/
+.vscode/
+docs/
